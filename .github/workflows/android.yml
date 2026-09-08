@@ -1,0 +1,74 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      # package.json を触ったあとは lock がずれるので frozen にしない
+      - name: Web をビルド
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+
+      # android/ をコミットしていない場合はここで生成される
+      - name: Capacitor に反映
+        run: |
+          [ -d android ] || npx cap add android
+          npx cap sync android
+
+      # DEBUG_KEYSTORE を登録しておくと署名が毎回同じになり、上書きインストールできる
+      - name: 署名鍵を復元
+        env:
+          KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            mkdir -p ~/.android
+            echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            echo "固定の署名鍵を使います"
+          else
+            echo "鍵が未登録です。実行ごとに署名が変わるため、更新時は先に古いアプリを削除してください"
+          fi
+
+      - name: APK をビルド
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shunataro-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      # タグを打ったときだけ、スマホから直接落とせる場所にも置く
+      - name: Release に添付
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
