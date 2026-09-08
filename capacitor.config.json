@@ -1,0 +1,9 @@
+{
+  "appId": "com.shunataro.burrow",
+  "appName": "しゅな太郎の穴ぐら暮らし",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#f5f2e9",
+    "allowMixedContent": false
+  }
+}
