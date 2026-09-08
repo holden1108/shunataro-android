@@ -27,7 +27,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
 
       # package.json を触ったあとは lock がずれるので frozen にしない
       - name: Web をビルド
